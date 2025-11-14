@@ -90,7 +90,7 @@ if 'page' not in st.session_state:
 if st.session_state['page'] == 'login':
     # ADD THIS LINE HERE:
     st.image("sungrow_logo.png", width=200) # Adjust width as neededs
-    st.title("🎓 Competency Assessment")
+    st.title("🎓 SG3600UD-MV CSP Competency Assessment")
     st.markdown("### Registration")
     
     with st.form("login_form"):
@@ -135,7 +135,7 @@ if st.session_state['page'] == 'login':
 # ==================================================
 elif st.session_state['page'] == 'quiz':
     info = st.session_state['candidate_info']
-    st.title("📝 Final Assessment")
+    st.title("📝 Quiz Assessments")
     st.caption(f"Candidate: **{info['Name']}** | Vendor: **{info['Vendor']}**")
     
     # Warning if points didn't sum perfectly to 100
