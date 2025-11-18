@@ -90,7 +90,7 @@ if 'page' not in st.session_state:
 if st.session_state['page'] == 'login':
     # ADD THIS LINE HERE:
     st.image("sungrow_logo.png", width=200) # Adjust width as neededs
-    st.title("🎓 SG3600UD-MV Safety Competency Assessment")
+    st.title("🎓 SG4400UD-MV CSP Competency Assessment")
     st.markdown("### Registration")
     
     with st.form("login_form"):
