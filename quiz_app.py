@@ -22,6 +22,9 @@ def load_questions():
     for col in cols_to_clean:
         if col in df.columns:
             df[col] = df[col].astype(str).replace('nan', '').str.strip()
+        else:
+            # If column E/F/G/H doesn't exist in Excel, create it as empty
+            df[col] = ""
             
     # Clean Type column
     if 'Type' in df.columns:
@@ -211,7 +214,7 @@ elif st.session_state['page'] == 'quiz':
                 for letter in OPTION_COLS:
                     if q[letter] != "":
                         options_map[letter] = q[letter]
-                        
+
                 # Parse Correct Answer Key (e.g., "A, C" or "B")
                 c_key_str = str(q['Correct Answer']).upper()
                 c_keys = [x.strip() for x in c_key_str.split(',')]
