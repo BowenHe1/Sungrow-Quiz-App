@@ -17,7 +17,7 @@ def load_questions():
     df = pd.read_excel(QUESTIONS_FILE)
     
     # Clean data: Ensure columns are strings and fill NaNs
-    cols_to_clean = ['A', 'B', 'C', 'D', 'Correct Answer']
+    cols_to_clean = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'Correct Answer']
     for col in cols_to_clean:
         if col in df.columns:
             df[col] = df[col].astype(str).replace('nan', '').str.strip()
