@@ -6,6 +6,7 @@ from datetime import datetime
 # --- CONFIGURATION ---
 QUESTIONS_FILE = "question_pool.xlsx"
 RESULTS_FILE = "quiz_results.csv"
+OPTION_COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 TARGET_POINTS = 100
 
 # --- HELPER FUNCTIONS ---
@@ -17,11 +18,14 @@ def load_questions():
     df = pd.read_excel(QUESTIONS_FILE)
     
     # Clean data: Ensure columns are strings and fill NaNs
-    cols_to_clean = ['A', 'B', 'C', 'D', 'Correct Answer']
+    cols_to_clean = OPTION_COLS + ['Correct Answer']
     for col in cols_to_clean:
         if col in df.columns:
             df[col] = df[col].astype(str).replace('nan', '').str.strip()
-            
+        else:
+            # If column E/F/G/H doesn't exist in Excel, create it as empty
+            df[col] = ""
+
     # Clean Type column
     if 'Type' in df.columns:
         df['Type'] = df['Type'].astype(str).str.strip().str.lower()
@@ -90,7 +94,7 @@ if 'page' not in st.session_state:
 if st.session_state['page'] == 'login':
     # ADD THIS LINE HERE:
     st.image("sungrow_logo.png", width=200) # Adjust width as neededs
-    st.title("🎓 SG3600UD-MV Safety Competency Assessment")
+    st.title("🎓 SG3150U-MV CSP Competency Assessment")
     st.markdown("### Registration")
     
     with st.form("login_form"):
@@ -152,12 +156,14 @@ elif st.session_state['page'] == 'quiz':
             # Identify Type
             q_type = q['Type']
             
-            # Get Valid Options (A, B, C, D) - filter out empty ones
-            options_map = {
-                'A': q['A'], 'B': q['B'], 'C': q['C'], 'D': q['D']
-            }
-            # Create list of texts for display
-            valid_options = [v for k, v in options_map.items() if v != '']
+            # Create a dictionary of all available options for this specific question
+            options_map = {}
+            for letter in OPTION_COLS:
+                if q[letter] != "": # Only add if the cell is not empty
+                    options_map[letter] = q[letter]
+
+            # Get just the text values for the buttons
+            valid_options_text = list(options_map.values())
             
             # --- RENDER BASED ON TYPE ---
             
@@ -165,7 +171,7 @@ elif st.session_state['page'] == 'quiz':
                 # Handles Standard Single Choice AND True/False
                 user_answers[i] = st.radio(
                     "Select Answer:", 
-                    valid_options, 
+                    valid_options_text, 
                     key=f"q{i}", 
                     index=None
                 )
@@ -174,7 +180,7 @@ elif st.session_state['page'] == 'quiz':
                 st.write("Select all that apply:")
                 user_answers[i] = st.multiselect(
                     "Options:", 
-                    valid_options, 
+                    valid_options_text, 
                     key=f"q{i}"
                 )
                 
@@ -183,7 +189,7 @@ elif st.session_state['page'] == 'quiz':
                 # Multiselect allows picking order
                 user_answers[i] = st.multiselect(
                     "Rank items:", 
-                    valid_options, 
+                    valid_options_text, 
                     key=f"q{i}"
                 )
                 
@@ -202,6 +208,13 @@ elif st.session_state['page'] == 'quiz':
                 q_type = q['Type']
                 points = q['Points']
                 
+                # --- REBUILD OPTION MAP FOR GRADING ---
+                # We need this to translate "A, B" back to "Apple, Banana"
+                options_map = {}
+                for letter in OPTION_COLS:
+                    if q[letter] != "":
+                        options_map[letter] = q[letter]
+
                 # Parse Correct Answer Key (e.g., "A, C" or "B")
                 c_key_str = str(q['Correct Answer']).upper()
                 c_keys = [x.strip() for x in c_key_str.split(',')]
@@ -209,8 +222,6 @@ elif st.session_state['page'] == 'quiz':
                 # Retrieve the ACTUAL TEXT of the correct options from the Excel row
                 # Example: if Correct Answer is 'A', we need the text in column 'A'
                 correct_texts = []
-                options_map = {'A': q['A'], 'B': q['B'], 'C': q['C'], 'D': q['D']}
-                
                 for k in c_keys:
                     if k in options_map:
                         correct_texts.append(options_map[k])
