@@ -1,3 +1,4 @@
+from xmlrpc import client
 import streamlit as st
 import pandas as pd
 import os
@@ -70,7 +71,8 @@ def save_submission(candidate_info, score, max_score, answers_log):
     
     # 3. Open the Sheet
     # Make sure this matches your Google Sheet name EXACTLY
-    sheet = client.open("Sungrow_Assessment_Results").sheet1
+    # Open the sheet directly using its ID (bypassing the "Drive Search" error)
+    sheet = client.open_by_key("18kGBJLPUu-VdQT4bRdME-X29kJjv7f5GDNKnAQ7dU2s").sheet1
     
     # 4. Prepare the Row
     row = [
