@@ -70,12 +70,12 @@ def save_submission(candidate_info, score, max_score, answers_log):
         s_info,
         scopes=scopes
     )
-    client = gspread.authorize(credentials)
+    gc = gspread.authorize(credentials)
     
     # 3. Open the Sheet
     # Make sure this matches your Google Sheet name EXACTLY
     # Open the sheet directly using its ID (bypassing the "Drive Search" error)
-    sheet = client.open_by_key("18kGBJLPUu-VdQT4bRdME-X29kJjv7f5GDNKnAQ7dU2s").SG3600UD_MV_CSP
+    sheet = gc.open_by_key("18kGBJLPUu-VdQT4bRdME-X29kJjv7f5GDNKnAQ7dU2s").SG3600UD_MV_CSP
     
     # 4. Prepare the Row
     row = [
