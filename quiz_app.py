@@ -194,7 +194,7 @@ elif st.session_state['page'] == 'quiz':
             if q_type == 'single': 
                 # --- SMART CONTEXT DETECTION ---
                 
-                # Check: Is "False", "false", or "0" present in the options?
+                # Check: Is "False", "false" present in the options?
                 has_boolean_partner = any(str(opt).strip().lower() in ['false', 'f'] for opt in valid_options_text)
 
                 # --- DISPLAY RULES ---
