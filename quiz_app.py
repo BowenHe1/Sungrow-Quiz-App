@@ -78,7 +78,7 @@ def save_submission(candidate_info, score, max_score, answers_log):
     # Using open_by_key is safer/faster than opening by name
     try:
         sh = gc.open_by_key("18kGBJLPUu-VdQT4bRdME-X29kJjv7f5GDNKnAQ7dU2s")
-        worksheet = sh.get_worksheet(0) # consistently gets the first tab
+        worksheet = sh.get_worksheet("SG3600UD_MV_CSP") # consistently gets the first tab
     except Exception as e:
         st.error(f"Google Sheets Connection Error: {e}")
         st.stop()
@@ -96,7 +96,7 @@ def save_submission(candidate_info, score, max_score, answers_log):
     ]
     
     # 5. Append to Sheet
-    sheet.append_row(row)
+    worksheet.append_row(row)
 
 #def check_if_taken(email):
 #    if not os.path.exists(RESULTS_FILE):
