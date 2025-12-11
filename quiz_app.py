@@ -20,6 +20,9 @@ def load_questions():
         
     df = pd.read_excel(QUESTIONS_FILE, dtype=str)
     
+    if 'Points' in df.columns:
+        df['Points'] = pd.to_numeric(df['Points'], errors='coerce').fillna(0).astype(int)
+        
     # Clean data: Ensure columns are strings and fill NaNs
     cols_to_clean = OPTION_COLS + ['Correct Answer']
     for col in cols_to_clean:
