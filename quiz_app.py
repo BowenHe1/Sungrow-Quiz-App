@@ -192,12 +192,25 @@ elif st.session_state['page'] == 'quiz':
             # --- RENDER BASED ON TYPE ---
             
             if q_type == 'single': 
-                # Handles Standard Single Choice AND True/False
+                # 1. Detect if this is a True/False question
+                # (Check if any option is "False", "false", or "0")
+                is_boolean = any(str(opt).lower() in ['false', 'f'] for opt in valid_options_text)
+
+                # 2. Define the Display Rules
+                def format_option(val):
+                    s = str(val).strip()
+                    # If it's a Boolean question, show "1" as "True"
+                    if is_boolean and s == '1':
+                        return "True"
+                    return s
+
+                # 3. Render Radio Button
                 user_answers[i] = st.radio(
                     "Select Answer:", 
                     valid_options_text, 
-                    key=f"q{i}", 
-                    index=None
+                    kesy=f"q{i}", 
+                    index=None,
+                    format_func=format_option  # <--- This applies the visual fix
                 )
 
             elif q_type == 'multi':
