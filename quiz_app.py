@@ -208,7 +208,7 @@ elif st.session_state['page'] == 'quiz':
                 user_answers[i] = st.radio(
                     "Select Answer:", 
                     valid_options_text, 
-                    kesy=f"q{i}", 
+                    key=f"q{i}", 
                     index=None,
                     format_func=format_option  # <--- This applies the visual fix
                 )
