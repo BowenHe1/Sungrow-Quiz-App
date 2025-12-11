@@ -1,4 +1,4 @@
-from xmlrpc import client
+#from xmlrpc import client
 import streamlit as st
 import pandas as pd
 import os
@@ -64,20 +64,26 @@ def save_submission(candidate_info, score, max_score, answers_log):
         "https://www.googleapis.com/auth/spreadsheets",
     ]
     
-    # 2. Authenticate using Streamlit Secrets
+    # 2. Authenticate
     s_info = st.secrets["gcp_service_account"]
     credentials = Credentials.from_service_account_info(
         s_info,
         scopes=scopes
     )
-    client = gspread.authorize(credentials)
     
-    # 3. Open the Sheet
-    # Make sure this matches your Google Sheet name EXACTLY
-    # Open the sheet directly using its ID (bypassing the "Drive Search" error)
-    sheet = client.open_by_key("18kGBJLPUu-VdQT4bRdME-X29kJjv7f5GDNKnAQ7dU2s").sheet1
+    # 3. Authorize (RENAME 'client' -> 'gc')
+    gc = gspread.authorize(credentials)
     
-    # 4. Prepare the Row
+    # 4. Open the Sheet (Use 'gc' here)
+    # Using open_by_key is safer/faster than opening by name
+    try:
+        sh = gc.open_by_key("18kGBJLPUu-VdQT4bRdME-X29kJjv7f5GDNKnAQ7dU2s")
+        worksheet = sh.worksheet("SG3600UD_MV_CSP") # consistently gets the first tab
+    except Exception as e:
+        st.error(f"Google Sheets Connection Error: {e}")
+        st.stop()
+    
+    # 5. Prepare and Append Row
     row = [
         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         candidate_info['Name'],
@@ -90,7 +96,7 @@ def save_submission(candidate_info, score, max_score, answers_log):
     ]
     
     # 5. Append to Sheet
-    sheet.append_row(row)
+    worksheet.append_row(row)
 
 #def check_if_taken(email):
 #    if not os.path.exists(RESULTS_FILE):
