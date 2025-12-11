@@ -64,6 +64,43 @@ def save_submission(candidate_info, score, max_score, answers_log):
         "https://www.googleapis.com/auth/spreadsheets",
     ]
     
+    # 2. Authenticate
+    s_info = st.secrets["gcp_service_account"]
+    credentials = Credentials.from_service_account_info(
+        s_info,
+        scopes=scopes
+    )
+    
+    # 3. Authorize (RENAME 'client' -> 'gc')
+    gc = gspread.authorize(credentials)
+    
+    # 4. Open the Sheet (Use 'gc' here)
+    # Using open_by_key is safer/faster than opening by name
+    try:
+        sh = gc.open_by_key("18kGBJLPUu-VdQT4bRdME-X29kJjv7f5GDNKnAQ7dU2s")
+        worksheet = sh.get_worksheet(0) # consistently gets the first tab
+    except Exception as e:
+        st.error(f"Google Sheets Connection Error: {e}")
+        st.stop()
+    
+    # 5. Prepare and Append Row
+    row = [
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        candidate_info['Name'],
+        candidate_info['Email'],
+        candidate_info['Vendor'],
+        candidate_info['Instructor'],
+        score,
+        max_score,
+        str(answers_log)
+    ]
+    
+    worksheet.append_row(row)
+    # 1. Define the Scope
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+    ]
+    
     # 2. Authenticate using Streamlit Secrets
     s_info = st.secrets["gcp_service_account"]
     credentials = Credentials.from_service_account_info(
