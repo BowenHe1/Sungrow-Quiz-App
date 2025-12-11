@@ -95,37 +95,6 @@ def save_submission(candidate_info, score, max_score, answers_log):
         str(answers_log)
     ]
     
-    worksheet.append_row(row)
-    # 1. Define the Scope
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-    ]
-    
-    # 2. Authenticate using Streamlit Secrets
-    s_info = st.secrets["gcp_service_account"]
-    credentials = Credentials.from_service_account_info(
-        s_info,
-        scopes=scopes
-    )
-    gc = gspread.authorize(credentials)
-    
-    # 3. Open the Sheet
-    # Make sure this matches your Google Sheet name EXACTLY
-    # Open the sheet directly using its ID (bypassing the "Drive Search" error)
-    sheet = gc.open_by_key("18kGBJLPUu-VdQT4bRdME-X29kJjv7f5GDNKnAQ7dU2s").SG3600UD_MV_CSP
-    
-    # 4. Prepare the Row
-    row = [
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        candidate_info['Name'],
-        candidate_info['Email'],
-        candidate_info['Vendor'],
-        candidate_info['Instructor'],
-        score,
-        max_score,
-        str(answers_log)
-    ]
-    
     # 5. Append to Sheet
     sheet.append_row(row)
 
