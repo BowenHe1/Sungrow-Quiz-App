@@ -288,7 +288,7 @@ elif st.session_state['page'] == 'quiz':
                         
                 elif q_type == 'text':
                     # No auto-grading. Just Log.
-                    details_log[f"Q{i+1}"] = f"[TEXT ANSWER]: {u_ans}"
+                    details_log[f"Q{i+1}"] = f"[ANSWER]: {u_ans}"
                     continue # Skip the score addition part
                 
                 # Apply Score
