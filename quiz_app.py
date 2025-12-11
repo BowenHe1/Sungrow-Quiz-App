@@ -18,7 +18,7 @@ def load_questions():
         st.error(f"File not found: {QUESTIONS_FILE}")
         return pd.DataFrame()
         
-    df = pd.read_excel(QUESTIONS_FILE)
+    df = pd.read_excel(QUESTIONS_FILE, dtype=str)
     
     # Clean data: Ensure columns are strings and fill NaNs
     cols_to_clean = OPTION_COLS + ['Correct Answer']
