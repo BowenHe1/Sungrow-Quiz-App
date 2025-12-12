@@ -233,7 +233,7 @@ elif st.session_state['page'] == 'quiz':
                     "Options:", 
                     valid_options_text, 
                     key=f"q{i}"
-                )s
+                )
                 
             elif q_type == 'order':
                 st.write("👇 **Select items in the correct order (1st, 2nd, 3rd...):**")
