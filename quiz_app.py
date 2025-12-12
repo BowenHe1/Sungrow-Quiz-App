@@ -97,7 +97,7 @@ def save_submission(candidate_info, score, max_score, answers_log):
 
 #def check_if_taken(email):
 #    if not os.path.exists(RESULTS_FILE):
-        return False
+      #  return False
 #    try:
 #        df = pd.read_csv(RESULTS_FILE)
 #        if 'Email' in df.columns:
