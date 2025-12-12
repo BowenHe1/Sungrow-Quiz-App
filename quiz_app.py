@@ -233,7 +233,7 @@ elif st.session_state['page'] == 'quiz':
             elif q_type == 'text':
                 user_answers[i] = st.text_area("Type your answer:", key=f"q{i}")
 
-        st.markdown("---")
+        st.markdown("---")submitted = st.form_submit_button("Submit Assessment", type="primary")
         submitted = st.form_submit_button("Submit Assessment", type="primary")
 
         if submitted:
