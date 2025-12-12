@@ -196,16 +196,28 @@ elif st.session_state['page'] == 'quiz':
             # --- RENDER BASED ON TYPE ---
             
             if q_type == 'single': 
-                # 1. Detect if this is a True/False question
-                # (Check if any option is "False", "false", or "0")
-                is_boolean = any(str(opt).lower() in ['false', 'f'] for opt in valid_options_text)
+                # --- SMART CONTEXT DETECTION ---
+                
+                # Check: Is "False", "false" present in the options?
+                has_boolean_partner = any(str(opt).strip().lower() in ['false', 'f'] for opt in valid_options_text)
 
-                # 2. Define the Display Rules
+                # --- DISPLAY RULES ---
                 def format_option(val):
                     s = str(val).strip()
-                    # If it's a Boolean question, show "1" as "True"
-                    if is_boolean and s == '1':
+                    s_lower = s.lower()
+                    
+                    # CASE A: We see "1", but we know it's a Boolean question (because "False" exists)
+                    # ACTION: Show "True"
+                    if has_boolean_partner and s == '1':
                         return "True"
+
+                    # CASE B: We see "True", but there is NO "False" option.
+                    # This implies "True" is an error (it should be the number 1).
+                    # ACTION: Show "1"
+                    if not has_boolean_partner and s_lower == 'true':
+                        return "1"
+                        
+                    # Default: Show text as-is (e.g., "2", "3", "Blue", "400V")
                     return s
 
                 # 3. Render Radio Button
@@ -214,7 +226,7 @@ elif st.session_state['page'] == 'quiz':
                     valid_options_text, 
                     key=f"q{i}", 
                     index=None,
-                    format_func=format_option  # <--- This applies the visual fix
+                    format_func=format_option 
                 )
 
             elif q_type == 'multi':
