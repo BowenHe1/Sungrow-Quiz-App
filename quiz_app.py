@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import os
 from datetime import datetime
+import gspread
+from google.oauth2.service_account import Credentials
 
 # --- CONFIGURATION ---
 QUESTIONS_FILE = "question_pool.xlsx"
@@ -22,7 +24,10 @@ def load_questions():
     for col in cols_to_clean:
         if col in df.columns:
             df[col] = df[col].astype(str).replace('nan', '').str.strip()
-            
+        else:
+            # If column E/F/G/H doesn't exist in Excel, create it as empty
+            df[col] = ""
+
     # Clean Type column
     if 'Type' in df.columns:
         df['Type'] = df['Type'].astype(str).str.strip().str.lower()
@@ -50,33 +55,56 @@ def select_random_questions(df, target):
     return selected, current_points
 
 def save_submission(candidate_info, score, max_score, answers_log):
-    # Create a record combining demographics + results
-    data = {
-        "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        **candidate_info, # Unpacks Name, Vendor, Instructor, Email
-        "Score": score,
-        "Total Possible": max_score,
-        "Details": str(answers_log)
-    }
-    df = pd.DataFrame([data])
+    # 1. Define the Scope
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+    ]
     
-    # Append to CSV (Create header if file doesn't exist)
-    if not os.path.exists(RESULTS_FILE):
-        df.to_csv(RESULTS_FILE, index=False)
-    else:
-        df.to_csv(RESULTS_FILE, mode='a', header=False, index=False)
-
-def check_if_taken(email):
-    if not os.path.exists(RESULTS_FILE):
-        return False
+    # 2. Authenticate
+    s_info = st.secrets["gcp_service_account"]
+    credentials = Credentials.from_service_account_info(
+        s_info,
+        scopes=scopes
+    )
+    
+    # 3. Authorize (RENAME 'client' -> 'gc')
+    gc = gspread.authorize(credentials)
+    
+    # 4. Open the Sheet (Use 'gc' here)
+    # Using open_by_key is safer/faster than opening by name
     try:
-        df = pd.read_csv(RESULTS_FILE)
-        if 'Email' in df.columns:
-            # Check if email exists (case insensitive)
-            return email.lower().strip() in df['Email'].str.lower().str.strip().values
-    except:
-        return False
-    return False
+        sh = gc.open_by_key("18kGBJLPUu-VdQT4bRdME-X29kJjv7f5GDNKnAQ7dU2s")
+        worksheet = sh.worksheet("PT1.0_CSP") # consistently gets the corresponding tab
+    except Exception as e:
+        st.error(f"Google Sheets Connection Error: {e}")
+        st.stop()
+    
+    # 5. Prepare and Append Row
+    row = [
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        candidate_info['Name'],
+        candidate_info['Email'],
+        candidate_info['Vendor'],
+        candidate_info['Instructor'],
+        score,
+        max_score,
+        str(answers_log)
+    ]
+    
+    # 5. Append to Sheet
+    worksheet.append_row(row)
+
+#def check_if_taken(email):
+#    if not os.path.exists(RESULTS_FILE):
+#        return False
+#    try:
+#        df = pd.read_csv(RESULTS_FILE)
+#        if 'Email' in df.columns:
+#            # Check if email exists (case insensitive)
+#            return email.lower().strip() in df['Email'].str.lower().str.strip().values
+#    except:
+#        return False
+#    return False
 
 # --- APP SETUP ---
 st.set_page_config(page_title="Assessment Portal", layout="centered")
@@ -108,8 +136,8 @@ if st.session_state['page'] == 'login':
         if start:
             if not (name and email and vendor and instructor):
                 st.error("⚠️ All fields are mandatory.")
-            elif check_if_taken(email):
-                st.error("❌ You have already submitted this assessment.")
+            #elif check_if_taken(email):
+            #    st.error("❌ You have already submitted this assessment.")
             else:
                 # Save Candidate Info
                 st.session_state['candidate_info'] = {
@@ -166,12 +194,37 @@ elif st.session_state['page'] == 'quiz':
             # --- RENDER BASED ON TYPE ---
             
             if q_type == 'single': 
-                # Handles Standard Single Choice AND True/False
+                # --- SMART CONTEXT DETECTION ---
+                
+                # Check: Is "False", "false" present in the options?
+                has_boolean_partner = any(str(opt).strip().lower() in ['false', 'f'] for opt in valid_options_text)
+
+                # --- DISPLAY RULES ---
+                def format_option(val):
+                    s = str(val).strip()
+                    s_lower = s.lower()
+                    
+                    # CASE A: We see "1", but we know it's a Boolean question (because "False" exists)
+                    # ACTION: Show "True"
+                    if has_boolean_partner and s == '1':
+                        return "True"
+
+                    # CASE B: We see "True", but there is NO "False" option.
+                    # This implies "True" is an error (it should be the number 1).
+                    # ACTION: Show "1"
+                    if not has_boolean_partner and s_lower == 'true':
+                        return "1"
+                        
+                    # Default: Show text as-is (e.g., "2", "3", "Blue", "400V")
+                    return s
+
+                # 3. Render Radio Button
                 user_answers[i] = st.radio(
                     "Select Answer:", 
                     valid_options_text, 
                     key=f"q{i}", 
-                    index=None
+                    index=None,
+                    format_func=format_option 
                 )
 
             elif q_type == 'multi':
@@ -245,7 +298,7 @@ elif st.session_state['page'] == 'quiz':
                         
                 elif q_type == 'text':
                     # No auto-grading. Just Log.
-                    details_log[f"Q{i+1}"] = f"[TEXT ANSWER]: {u_ans}"
+                    details_log[f"Q{i+1}"] = f"[ANSWER]: {u_ans}"
                     continue # Skip the score addition part
                 
                 # Apply Score
