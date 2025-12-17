@@ -136,8 +136,8 @@ if st.session_state['page'] == 'login':
         if start:
             if not (name and email and vendor and instructor):
                 st.error("⚠️ All fields are mandatory.")
-            elif check_if_taken(email):
-                st.error("❌ You have already submitted this assessment.")
+            #elif check_if_taken(email):
+            #    st.error("❌ You have already submitted this assessment.")
             else:
                 # Save Candidate Info
                 st.session_state['candidate_info'] = {
