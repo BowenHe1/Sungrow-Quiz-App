@@ -74,7 +74,7 @@ def save_submission(candidate_info, score, max_score, answers_log):
     # Using open_by_key is safer/faster than opening by name
     try:
         sh = gc.open_by_key("18kGBJLPUu-VdQT4bRdME-X29kJjv7f5GDNKnAQ7dU2s")
-        worksheet = sh.worksheet("SG4400UD_MV_Safety") # consistently gets the corresponding tab
+        worksheet = sh.worksheet("SG350HX_CSP") # consistently gets the corresponding tab
     except Exception as e:
         st.error(f"Google Sheets Connection Error: {e}")
         st.stop()
@@ -107,7 +107,7 @@ if 'page' not in st.session_state:
 if st.session_state['page'] == 'login':
     # ADD THIS LINE HERE:
     st.image("sungrow_logo.png", width=200) # Adjust width as neededs
-    st.title("🎓 SG4400UD-MV Safety Competency Assessment")
+    st.title("🎓 SG350HX CSP Competency Assessment")
     st.markdown("### Registration")
     
     with st.form("login_form"):
