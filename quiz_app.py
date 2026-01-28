@@ -24,6 +24,9 @@ def load_questions():
     for col in cols_to_clean:
         if col in df.columns:
             df[col] = df[col].astype(str).replace('nan', '').str.strip()
+        else:
+            # If column E/F/G/H doesn't exist in Excel, create it as empty
+            df[col] = ""
             
     # Clean Type column
     if 'Type' in df.columns:
