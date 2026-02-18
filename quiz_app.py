@@ -19,6 +19,9 @@ def load_questions():
         
     df = pd.read_excel(QUESTIONS_FILE)
     
+    # NEW: Capture the 1-based Excel row index (index + 2 because 0-based + header)
+    df['row_index'] = df.index + 2
+
     # Clean data: Ensure columns are strings and fill NaNs
     cols_to_clean = OPTION_COLS + ['Correct Answer']
     for col in cols_to_clean:
@@ -256,7 +259,11 @@ elif st.session_state['page'] == 'quiz':
                 u_ans = user_answers.get(i) # User's answer (Text or List of Texts)
                 q_type = q['Type']
                 points = q['Points']
-                
+                r_idx = q['row_index'] # The 1-based Excel ID
+
+                # Setup Option Map
+                options_map = {letter: q.get(letter, "") for letter in OPTION_COLS if str(q.get(letter, "")).strip() != ""}
+
                 # Parse Correct Answer Key (e.g., "A, C" or "B")
                 c_key_str = str(q['Correct Answer']).upper()
                 c_keys = [x.strip() for x in c_key_str.split(',')]
@@ -295,9 +302,15 @@ elif st.session_state['page'] == 'quiz':
                 # Apply Score
                 if is_correct:
                     score += points
-                    details_log[f"Q{i+1}"] = "Correct"
-                else:
-                    details_log[f"Q{i+1}"] = "Incorrect"
+
+                details_log[r_idx] = {
+                    "answer": u_ans,
+                    "correct": is_correct,
+                    "type": q_type.capitalize()
+                }
+                    #details_log[f"Q{i+1}"] = "Correct"
+                #else:
+                 #   details_log[f"Q{i+1}"] = "Incorrect"
 
             # SAVE
             save_submission(
