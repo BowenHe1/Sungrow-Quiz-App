@@ -320,6 +320,17 @@ elif st.session_state['page'] == 'quiz':
                 details_log
             )
             
-            st.success("✅ Assessment Submitted Successfully!")
+            # --- ROUTE TO FINISH PAGE ---
+            st.session_state['page'] = 'success'
+            st.rerun() # Instantly reloads the app
+
+            # ==================================================
+            # PAGE 3: SUBMISSION SUCCESS
+            # ==================================================
+        elif st.session_state['page'] == 'success':
+            st.title("🎉 Assessment Complete!")
+            st.success("Your answers have been successfully recorded. Thank you!")
             st.balloons()
-            st.stop() # Stops script so they can't go back
+    
+            st.markdown("---")
+            st.info("You may now close this tab/window.")
