@@ -327,3 +327,6 @@ elif st.session_state['page'] == 'success':
     st.title("🎉 Assessment Complete!")
     st.success("Your answers have been successfully recorded. Thank you!")
     st.balloons()
+
+    st.markdown("---")
+    st.info("You may now close this tab/window.")
