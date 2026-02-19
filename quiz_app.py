@@ -82,7 +82,7 @@ def save_submission(candidate_info, score, max_score, answers_log):
     # Using open_by_key is safer/faster than opening by name
     try:
         sh = gc.open_by_key("18kGBJLPUu-VdQT4bRdME-X29kJjv7f5GDNKnAQ7dU2s")
-        worksheet = sh.worksheet("SG350HX_CSP") # consistently gets the first tab
+        worksheet = sh.worksheet("SG350HX_Safety") # consistently gets the corresponding tab
     except Exception as e:
         st.error(f"Google Sheets Connection Error: {e}")
         st.stop()
