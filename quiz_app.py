@@ -19,6 +19,9 @@ def load_questions():
         
     df = pd.read_excel(QUESTIONS_FILE)
     
+    # NEW: Capture the 1-based Excel row index (index + 2 because 0-based + header)
+    df['row_index'] = df.index + 2
+
     # Clean data: Ensure columns are strings and fill NaNs
     cols_to_clean = OPTION_COLS + ['Correct Answer']
     for col in cols_to_clean:
@@ -257,13 +260,17 @@ elif st.session_state['page'] == 'quiz':
                 u_ans = user_answers.get(i) # User's answer (Text or List of Texts)
                 q_type = q['Type']
                 points = q['Points']
-                
+                r_idx = q['row_index'] # The 1-based Excel ID
+
+                # Setup Option Map
+                options_map = {letter: q.get(letter, "") for letter in OPTION_COLS if str(q.get(letter, "")).strip() != ""}
+
                 # --- REBUILD OPTION MAP FOR GRADING ---
                 # We need this to translate "A, B" back to "Apple, Banana"
-                options_map = {}
-                for letter in OPTION_COLS:
-                    if q[letter] != "":
-                        options_map[letter] = q[letter]
+                #options_map = {}
+                #for letter in OPTION_COLS:
+                #    if q[letter] != "":
+                #        options_map[letter] = q[letter]
 
                 # Parse Correct Answer Key (e.g., "A, C" or "B")
                 c_key_str = str(q['Correct Answer']).upper()
@@ -304,9 +311,11 @@ elif st.session_state['page'] == 'quiz':
                 # Apply Score
                 if is_correct:
                     score += points
-                    details_log[f"Q{i+1}"] = "Correct"
-                else:
-                    details_log[f"Q{i+1}"] = "Incorrect"
+                details_log[r_idx] = {
+                    "answer": u_ans,
+                    "correct": is_correct,
+                    "type": q_type.capitalize()
+                }
 
             # SAVE
             save_submission(
@@ -316,6 +325,17 @@ elif st.session_state['page'] == 'quiz':
                 details_log
             )
             
-            st.success("✅ Assessment Submitted Successfully!")
-            st.balloons()
-            st.stop() # Stops script so they can't go back
+            # --- ROUTE TO FINISH PAGE ---
+            st.session_state['page'] = 'success'
+            st.rerun() # Instantly reloads the app
+
+            # ==================================================
+            # PAGE 3: SUBMISSION SUCCESS
+            # ==================================================
+elif st.session_state['page'] == 'success':
+    st.title("🎉 Assessment Complete!")
+    st.success("Your answers have been successfully recorded. Thank you!")
+    st.balloons()
+    
+    st.markdown("---")
+    st.info("You may now close this tab/window.")
