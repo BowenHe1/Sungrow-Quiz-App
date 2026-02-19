@@ -303,9 +303,10 @@ elif st.session_state['page'] == 'quiz':
                         is_correct = True
                         
                 elif q_type == 'text':
+                    is_correct = None
                     # No auto-grading. Just Log.
-                    details_log[f"Q{i+1}"] = f"[ANSWER]: {u_ans}"
-                    continue # Skip the score addition part
+                    # details_log[f"Q{i+1}"] = f"[ANSWER]: {u_ans}"
+                    # continue # Skip the score addition part
                 
                 # Apply Score
                 if is_correct:
