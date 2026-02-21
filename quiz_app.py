@@ -2,11 +2,14 @@ import streamlit as st
 import pandas as pd
 import os
 from datetime import datetime
+import gspread
+from google.oauth2.service_account import Credentials
 
 # --- CONFIGURATION ---
 QUESTIONS_FILE = "question_pool.xlsx"
 RESULTS_FILE = "quiz_results.csv"
 TARGET_POINTS = 100
+OPTION_COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
 # --- HELPER FUNCTIONS ---
 def load_questions():
@@ -16,12 +19,18 @@ def load_questions():
         
     df = pd.read_excel(QUESTIONS_FILE)
     
+    # NEW: Capture the 1-based Excel row index (index + 2 because 0-based + header)
+    df['row_index'] = df.index + 2
+
     # Clean data: Ensure columns are strings and fill NaNs
-    cols_to_clean = ['A', 'B', 'C', 'D', 'Correct Answer']
+    cols_to_clean = OPTION_COLS + ['Correct Answer']
     for col in cols_to_clean:
         if col in df.columns:
             df[col] = df[col].astype(str).replace('nan', '').str.strip()
-            
+        else:
+            # If column E/F/G/H doesn't exist in Excel, create it as empty
+            df[col] = ""
+
     # Clean Type column
     if 'Type' in df.columns:
         df['Type'] = df['Type'].astype(str).str.strip().str.lower()
@@ -49,33 +58,56 @@ def select_random_questions(df, target):
     return selected, current_points
 
 def save_submission(candidate_info, score, max_score, answers_log):
-    # Create a record combining demographics + results
-    data = {
-        "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        **candidate_info, # Unpacks Name, Vendor, Instructor, Email
-        "Score": score,
-        "Total Possible": max_score,
-        "Details": str(answers_log)
-    }
-    df = pd.DataFrame([data])
+    # 1. Define the Scope
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+    ]
     
-    # Append to CSV (Create header if file doesn't exist)
-    if not os.path.exists(RESULTS_FILE):
-        df.to_csv(RESULTS_FILE, index=False)
-    else:
-        df.to_csv(RESULTS_FILE, mode='a', header=False, index=False)
-
-def check_if_taken(email):
-    if not os.path.exists(RESULTS_FILE):
-        return False
+    # 2. Authenticate
+    s_info = st.secrets["gcp_service_account"]
+    credentials = Credentials.from_service_account_info(
+        s_info,
+        scopes=scopes
+    )
+    
+    # 3. Authorize (RENAME 'client' -> 'gc')
+    gc = gspread.authorize(credentials)
+    
+    # 4. Open the Sheet (Use 'gc' here)
+    # Using open_by_key is safer/faster than opening by name
     try:
-        df = pd.read_csv(RESULTS_FILE)
-        if 'Email' in df.columns:
-            # Check if email exists (case insensitive)
-            return email.lower().strip() in df['Email'].str.lower().str.strip().values
-    except:
-        return False
-    return False
+        sh = gc.open_by_key("18kGBJLPUu-VdQT4bRdME-X29kJjv7f5GDNKnAQ7dU2s")
+        worksheet = sh.worksheet("Transformer_CSP") # consistently gets the corresponding tab
+    except Exception as e:
+        st.error(f"Google Sheets Connection Error: {e}")
+        st.stop()
+    
+    # 5. Prepare and Append Row
+    row = [
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        candidate_info['Name'],
+        candidate_info['Email'],
+        candidate_info['Vendor'],
+        candidate_info['Instructor'],
+        score,
+        max_score,
+        str(answers_log)
+    ]
+    
+    # 5. Append to Sheet
+    worksheet.append_row(row)
+
+# def check_if_taken(email):
+#    if not os.path.exists(RESULTS_FILE):
+#        return False
+#    try:
+#        df = pd.read_csv(RESULTS_FILE)
+#        if 'Email' in df.columns:
+#            # Check if email exists (case insensitive)
+#            return email.lower().strip() in df['Email'].str.lower().str.strip().values
+#    except:
+#       return False
+#    return False
 
 # --- APP SETUP ---
 st.set_page_config(page_title="Assessment Portal", layout="centered")
@@ -90,7 +122,7 @@ if 'page' not in st.session_state:
 if st.session_state['page'] == 'login':
     # ADD THIS LINE HERE:
     st.image("sungrow_logo.png", width=200) # Adjust width as neededs
-    st.title("🎓 SG3600UD-MV Safety Competency Assessment")
+    st.title("🎓 Transformer CSP Competency Assessment")
     st.markdown("### Registration")
     
     with st.form("login_form"):
@@ -107,8 +139,8 @@ if st.session_state['page'] == 'login':
         if start:
             if not (name and email and vendor and instructor):
                 st.error("⚠️ All fields are mandatory.")
-            elif check_if_taken(email):
-                st.error("❌ You have already submitted this assessment.")
+            # elif check_if_taken(email):
+            #    st.error("❌ You have already submitted this assessment.")
             else:
                 # Save Candidate Info
                 st.session_state['candidate_info'] = {
@@ -153,28 +185,56 @@ elif st.session_state['page'] == 'quiz':
             q_type = q['Type']
             
             # Get Valid Options (A, B, C, D) - filter out empty ones
-            options_map = {
-                'A': q['A'], 'B': q['B'], 'C': q['C'], 'D': q['D']
-            }
+            options_map = {}
+            for letter in OPTION_COLS:
+                if q[letter] != "": # Only add if the cell is not empty
+                    options_map[letter] = q[letter]
+
             # Create list of texts for display
-            valid_options = [v for k, v in options_map.items() if v != '']
+            valid_options_text = list(options_map.values())
             
             # --- RENDER BASED ON TYPE ---
             
             if q_type == 'single': 
-                # Handles Standard Single Choice AND True/False
+                # --- SMART CONTEXT DETECTION ---
+                
+                # Check: Is "False", "false" present in the options?
+                has_boolean_partner = any(str(opt).strip().lower() in ['false', 'f'] for opt in valid_options_text)
+
+                # --- DISPLAY RULES ---
+                def format_option(val):
+                    s = str(val).strip()
+                    s_lower = s.lower()
+                    
+                    # CASE A: We see "1", but we know it's a Boolean question (because "False" exists)
+                    # ACTION: Show "True"
+                    if has_boolean_partner and s == '1':
+                        return "True"
+
+                    # CASE B: We see "True", but there is NO "False" option.
+                    # This implies "True" is an error (it should be the number 1).
+                    # ACTION: Show "1"
+                    if not has_boolean_partner and s_lower == 'true':
+                        return "1"
+                        
+                    # Default: Show text as-is (e.g., "2", "3", "Blue", "400V")
+                    return s
+
+                # 3. Render Radio Button
                 user_answers[i] = st.radio(
                     "Select Answer:", 
-                    valid_options, 
+                    valid_options_text, 
                     key=f"q{i}", 
-                    index=None
+                    index=None,
+                    format_func=format_option 
                 )
+
 
             elif q_type == 'multi':
                 st.write("Select all that apply:")
                 user_answers[i] = st.multiselect(
                     "Options:", 
-                    valid_options, 
+                    valid_options_text, 
                     key=f"q{i}"
                 )
                 
@@ -183,7 +243,7 @@ elif st.session_state['page'] == 'quiz':
                 # Multiselect allows picking order
                 user_answers[i] = st.multiselect(
                     "Rank items:", 
-                    valid_options, 
+                    valid_options_text, 
                     key=f"q{i}"
                 )
                 
@@ -201,7 +261,11 @@ elif st.session_state['page'] == 'quiz':
                 u_ans = user_answers.get(i) # User's answer (Text or List of Texts)
                 q_type = q['Type']
                 points = q['Points']
-                
+                r_idx = q['row_index'] # The 1-based Excel ID
+
+                # Setup Option Map
+                options_map = {letter: q.get(letter, "") for letter in OPTION_COLS if str(q.get(letter, "")).strip() != ""}
+
                 # Parse Correct Answer Key (e.g., "A, C" or "B")
                 c_key_str = str(q['Correct Answer']).upper()
                 c_keys = [x.strip() for x in c_key_str.split(',')]
@@ -209,7 +273,7 @@ elif st.session_state['page'] == 'quiz':
                 # Retrieve the ACTUAL TEXT of the correct options from the Excel row
                 # Example: if Correct Answer is 'A', we need the text in column 'A'
                 correct_texts = []
-                options_map = {'A': q['A'], 'B': q['B'], 'C': q['C'], 'D': q['D']}
+                # options_map = {'A': q['A'], 'B': q['B'], 'C': q['C'], 'D': q['D']}
                 
                 for k in c_keys:
                     if k in options_map:
@@ -235,16 +299,23 @@ elif st.session_state['page'] == 'quiz':
                         is_correct = True
                         
                 elif q_type == 'text':
+                    is_correct = None
                     # No auto-grading. Just Log.
-                    details_log[f"Q{i+1}"] = f"[TEXT ANSWER]: {u_ans}"
-                    continue # Skip the score addition part
+                    # details_log[f"Q{i+1}"] = f"[TEXT ANSWER]: {u_ans}"
+                    # continue # Skip the score addition part
                 
                 # Apply Score
                 if is_correct:
                     score += points
-                    details_log[f"Q{i+1}"] = "Correct"
-                else:
-                    details_log[f"Q{i+1}"] = "Incorrect"
+                
+                details_log[r_idx] = {
+                    "answer": u_ans,
+                    "correct": is_correct,
+                    "type": q_type.capitalize()
+                }
+                #    details_log[f"Q{i+1}"] = "Correct"
+                # else:
+                #    details_log[f"Q{i+1}"] = "Incorrect"
 
             # SAVE
             save_submission(
@@ -254,6 +325,19 @@ elif st.session_state['page'] == 'quiz':
                 details_log
             )
             
-            st.success("✅ Assessment Submitted Successfully!")
-            st.balloons()
-            st.stop() # Stops script so they can't go back
+            # --- ROUTE TO FINISH PAGE ---
+            st.session_state['page'] = 'success'
+            st.rerun() # Instantly reloads the app
+
+            # ==================================================
+            # PAGE 3: SUBMISSION SUCCESS
+            # ==================================================
+elif st.session_state['page'] == 'success':
+    st.title("🎉 Assessment Complete!")
+    st.success("Your answers have been successfully recorded. Thank you!")
+    st.balloons()
+    
+    st.markdown("---")
+    st.info("You may now close this tab/window.")
+
+            
