@@ -30,7 +30,7 @@ def load_questions():
         else:
             # If column E/F/G/H doesn't exist in Excel, create it as empty
             df[col] = ""
-
+            
     # Clean Type column
     if 'Type' in df.columns:
         df['Type'] = df['Type'].astype(str).str.strip().str.lower()
@@ -77,7 +77,7 @@ def save_submission(candidate_info, score, max_score, answers_log):
     # Using open_by_key is safer/faster than opening by name
     try:
         sh = gc.open_by_key("18kGBJLPUu-VdQT4bRdME-X29kJjv7f5GDNKnAQ7dU2s")
-        worksheet = sh.worksheet("Transformer_CSP_Safety") # consistently gets the corresponding tab
+        worksheet = sh.worksheet("SC5000UD_MV_P3_CSP") # consistently gets the corresponding tab
     except Exception as e:
         st.error(f"Google Sheets Connection Error: {e}")
         st.stop()
@@ -122,7 +122,7 @@ if 'page' not in st.session_state:
 if st.session_state['page'] == 'login':
     # ADD THIS LINE HERE:
     st.image("sungrow_logo.png", width=200) # Adjust width as neededs
-    st.title("🎓 Transformer Safety Competency Assessment")
+    st.title("🎓 SC5000UD-MV-P3 CSP Competency Assessment")
     st.markdown("### Registration")
     
     with st.form("login_form"):
@@ -190,7 +190,7 @@ elif st.session_state['page'] == 'quiz':
                 if q[letter] != "": # Only add if the cell is not empty
                     options_map[letter] = q[letter]
 
-            # Create list of texts for display
+            # Get just the text values for the buttons
             valid_options_text = list(options_map.values())
             
             # --- RENDER BASED ON TYPE ---
@@ -261,9 +261,16 @@ elif st.session_state['page'] == 'quiz':
                 q_type = q['Type']
                 points = q['Points']
                 r_idx = q['row_index'] # The 1-based Excel ID
-                
+
                 # Setup Option Map
                 options_map = {letter: q.get(letter, "") for letter in OPTION_COLS if str(q.get(letter, "")).strip() != ""}
+
+                # --- REBUILD OPTION MAP FOR GRADING ---
+                # We need this to translate "A, B" back to "Apple, Banana"
+                #options_map = {}
+                #for letter in OPTION_COLS:
+                #    if q[letter] != "":
+                #        options_map[letter] = q[letter]
 
                 # Parse Correct Answer Key (e.g., "A, C" or "B")
                 c_key_str = str(q['Correct Answer']).upper()
@@ -272,7 +279,6 @@ elif st.session_state['page'] == 'quiz':
                 # Retrieve the ACTUAL TEXT of the correct options from the Excel row
                 # Example: if Correct Answer is 'A', we need the text in column 'A'
                 correct_texts = []
-                #options_map = {'A': q['A'], 'B': q['B'], 'C': q['C'], 'D': q['D']}
                 
                 for k in c_keys:
                     if k in options_map:
@@ -300,13 +306,13 @@ elif st.session_state['page'] == 'quiz':
                 elif q_type == 'text':
                     is_correct = None
                     # No auto-grading. Just Log.
-                    # details_log[f"Q{i+1}"] = f"[TEXT ANSWER]: {u_ans}"
-                    # continue # Skip the score addition part
+                    #details_log[f"Q{i+1}"] = f"[ANSWER]: {u_ans}"
+                    #continue # Skip the score addition part
                 
                 # Apply Score
                 if is_correct:
                     score += points
-
+                
                 details_log[r_idx] = {
                     "answer": u_ans,
                     "correct": is_correct,
