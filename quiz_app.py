@@ -91,11 +91,77 @@ def save_submission(candidate_info, score, max_score, answers_log):
         candidate_info['Instructor'],
         score,
         max_score,
-        str(answers_log)
+        "",  # placeholder for rich-text answers cell
     ]
     
-    # 5. Append to Sheet
+    # 5. Append main row (A-G), leave column H empty for rich text
     worksheet.append_row(row)
+
+    # 6. Build rich text for the answers cell (column H)
+    #    Q-labels -> bold orange | wrong answer text -> bold red | correct=FALSE -> bold red
+    FMT_ORANGE  = {"bold": True, "foregroundColor": {"red": 1.0, "green": 0.6, "blue": 0.0}}
+    FMT_RED     = {"bold": True, "foregroundColor": {"red": 1.0, "green": 0.0, "blue": 0.0}}
+    FMT_DEFAULT = {}
+
+    sorted_keys = sorted(answers_log.keys())
+    text_segments = []  # list of (text_str, format_dict)
+
+    for i, r_idx in enumerate(sorted_keys):
+        result = answers_log[r_idx]
+        is_correct = result.get('correct')
+        answer_text = str(result.get('answer', ''))
+        correct_text = "FALSE" if is_correct is False else "TRUE" if is_correct is True else "N/A"
+
+        if i > 0:
+            text_segments.append(("\n", FMT_DEFAULT))
+
+        # Question label: bold orange
+        text_segments.append((f"Q{r_idx}: ", FMT_ORANGE))
+
+        # Actual answer: bold red if wrong, default if correct
+        text_segments.append((answer_text, FMT_RED if is_correct is False else FMT_DEFAULT))
+
+        # " | Correct: " separator: default
+        text_segments.append((" | Correct: ", FMT_DEFAULT))
+
+        # Correct value: bold red if FALSE, default if TRUE
+        text_segments.append((correct_text, FMT_RED if is_correct is False else FMT_DEFAULT))
+
+    # Build plain string + textFormatRuns
+    full_text = ""
+    format_runs = []
+    pos = 0
+    prev_fmt = None
+
+    for text, fmt in text_segments:
+        if fmt != prev_fmt:
+            format_runs.append({"startIndex": pos, "format": fmt})
+            prev_fmt = fmt
+        full_text += text
+        pos += len(text)
+
+    # 7. Write rich text into the last appended row, column H (0-based index 7)
+    last_row = len(worksheet.get_all_values())
+    row_idx_0 = last_row - 1
+
+    sh.batch_update({"requests": [{
+        "updateCells": {
+            "rows": [{
+                "values": [{
+                    "userEnteredValue": {"stringValue": full_text},
+                    "textFormatRuns": format_runs
+                }]
+            }],
+            "fields": "userEnteredValue,textFormatRuns",
+            "range": {
+                "sheetId": worksheet.id,
+                "startRowIndex": row_idx_0,
+                "endRowIndex": row_idx_0 + 1,
+                "startColumnIndex": 7,  # column H
+                "endColumnIndex": 8,
+            }
+        }
+    }]})
 
 
 #def check_if_taken(email):
