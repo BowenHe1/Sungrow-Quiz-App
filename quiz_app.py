@@ -62,27 +62,26 @@ def save_submission(candidate_info, score, max_score, answers_log):
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
     ]
-    
+
     # 2. Authenticate
     s_info = st.secrets["gcp_service_account"]
     credentials = Credentials.from_service_account_info(
         s_info,
         scopes=scopes
     )
-    
+
     # 3. Authorize (RENAME 'client' -> 'gc')
     gc = gspread.authorize(credentials)
-    
+
     # 4. Open the Sheet (Use 'gc' here)
-    # Using open_by_key is safer/faster than opening by name
     try:
         sh = gc.open_by_key("18kGBJLPUu-VdQT4bRdME-X29kJjv7f5GDNKnAQ7dU2s")
-        worksheet = sh.worksheet("SC5000UD_MV_P3_Safety") # consistently gets the corresponding tab
+        worksheet = sh.worksheet("SC5000UD_MV_P3_Safety")
     except Exception as e:
         st.error(f"Google Sheets Connection Error: {e}")
         st.stop()
-    
-    # 5. Prepare and Append Row
+
+    # 5. Append main row (A–G), leave column H empty for rich text
     row = [
         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         candidate_info['Name'],
@@ -91,11 +90,75 @@ def save_submission(candidate_info, score, max_score, answers_log):
         candidate_info['Instructor'],
         score,
         max_score,
-        str(answers_log)
+        "",  # placeholder for rich-text answers cell
     ]
-    
-    # 5. Append to Sheet
     worksheet.append_row(row)
+
+    # 6. Build rich text for the answers cell (column H)
+    #    Q-labels → bold orange | FALSE → bold red | TRUE/N/A → default black
+    FMT_ORANGE  = {"bold": True, "foregroundColor": {"red": 1.0, "green": 0.6, "blue": 0.0}}
+    FMT_RED     = {"bold": True, "foregroundColor": {"red": 1.0, "green": 0.0, "blue": 0.0}}
+    FMT_DEFAULT = {}
+
+    sorted_keys = sorted(answers_log.keys())
+    text_segments = []  # list of (text_str, format_dict)
+
+    for i, r_idx in enumerate(sorted_keys):
+        result = answers_log[r_idx]
+        is_correct = result.get('correct')
+        answer_text = str(result.get('answer', ''))
+        correct_text = "FALSE" if is_correct is False else "TRUE" if is_correct is True else "N/A"
+
+        if i > 0:
+            text_segments.append(("\n", FMT_DEFAULT))
+
+        # Question label: bold orange
+        text_segments.append((f"Q{r_idx}: ", FMT_ORANGE))
+
+        # Actual answer: bold red if wrong, default if correct
+        text_segments.append((answer_text, FMT_RED if is_correct is False else FMT_DEFAULT))
+
+        # " | Correct: " separator: default
+        text_segments.append((" | Correct: ", FMT_DEFAULT))
+
+        # Correct value: bold red if FALSE, default if TRUE
+        text_segments.append((correct_text, FMT_RED if is_correct is False else FMT_DEFAULT))
+
+    # Build plain string + textFormatRuns
+    full_text = ""
+    format_runs = []
+    pos = 0
+    prev_fmt = None
+
+    for text, fmt in text_segments:
+        if fmt != prev_fmt:
+            format_runs.append({"startIndex": pos, "format": fmt})
+            prev_fmt = fmt
+        full_text += text
+        pos += len(text)
+
+    # 7. Write rich text into the last appended row, column H (0-based index 7)
+    last_row = len(worksheet.get_all_values())
+    row_idx_0 = last_row - 1
+
+    sh.batch_update({"requests": [{
+        "updateCells": {
+            "rows": [{
+                "values": [{
+                    "userEnteredValue": {"stringValue": full_text},
+                    "textFormatRuns": format_runs
+                }]
+            }],
+            "fields": "userEnteredValue,textFormatRuns",
+            "range": {
+                "sheetId": worksheet.id,
+                "startRowIndex": row_idx_0,
+                "endRowIndex": row_idx_0 + 1,
+                "startColumnIndex": 7,  # column H
+                "endColumnIndex": 8,
+            }
+        }
+    }]})
 
 #def check_if_taken(email):
 #    if not os.path.exists(RESULTS_FILE):
