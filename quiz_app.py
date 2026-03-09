@@ -120,7 +120,8 @@ def save_submission(candidate_info, score, max_score, answers_log):
             text_segments.append(("\n", FMT_DEFAULT))
 
         # Question label: bold orange
-        text_segments.append((f"Q{r_idx}: ", FMT_ORANGE))
+        q_type_str = result.get('type', '')
+        text_segments.append((f"Q{r_idx} ({q_type_str}): ", FMT_ORANGE))
 
         # Actual answer: bold red if wrong, default if correct
         text_segments.append((answer_text, FMT_RED if is_correct is False else FMT_DEFAULT))
