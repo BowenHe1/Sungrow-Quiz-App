@@ -87,7 +87,7 @@ def save_submission(candidate_info, score, max_score, answers_log):
         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         candidate_info['Name'],
         candidate_info['Email'],
-        candidate_info['Vendor'],
+        candidate_info['Company'],
         candidate_info['Instructor'],
         score,
         max_score,
@@ -198,7 +198,7 @@ if st.session_state['page'] == 'login':
         # Mandatory Fields
         name = col1.text_input("Full Name *")
         email = col2.text_input("Company Email *")
-        vendor = col1.text_input("Vendor Name *")
+        vendor = col1.text_input("Company Name *")
         instructor = col2.text_input("Instructor Name *")
         
         start = st.form_submit_button("Start Assessment", type="primary")
@@ -211,7 +211,7 @@ if st.session_state['page'] == 'login':
                 st.session_state['candidate_info'] = {
                     "Name": name, 
                     "Email": email.lower().strip(), 
-                    "Vendor": vendor, 
+                    "Company": vendor, 
                     "Instructor": instructor
                 }
                 
@@ -233,7 +233,7 @@ if st.session_state['page'] == 'login':
 elif st.session_state['page'] == 'quiz':
     info = st.session_state['candidate_info']
     st.title("📝 Quiz Assessments")
-    st.caption(f"Candidate: **{info['Name']}** | Vendor: **{info['Vendor']}**")
+    st.caption(f"Candidate: **{info['Name']}** | Company: **{info['Company']}**")
     
     # Warning if points didn't sum perfectly to 100
     if st.session_state['total_points'] != TARGET_POINTS:
