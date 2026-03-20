@@ -4,12 +4,14 @@ import os
 from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
+from streamlit_autorefresh import st_autorefresh
 
 # --- CONFIGURATION ---
 QUESTIONS_FILE = "question_pool.xlsx"
 RESULTS_FILE = "quiz_results.csv"
 TARGET_POINTS = 100
 OPTION_COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+QUIZ_DURATION_SECONDS = 45 * 60  # 45 minutes
 
 # --- HELPER FUNCTIONS ---
 def load_questions():
@@ -164,6 +166,52 @@ def save_submission(candidate_info, score, max_score, answers_log):
         }
     }]})
 
+def grade_and_submit(questions, user_answers):
+    """Grade answers and save submission. Used by both manual submit and auto-submit."""
+    score = 0
+    details_log = {}
+
+    for i, q in enumerate(questions):
+        u_ans = user_answers.get(i)
+        q_type = q['Type']
+        points = q['Points']
+        r_idx = q['row_index']
+
+        options_map = {letter: q.get(letter, "") for letter in OPTION_COLS if str(q.get(letter, "")).strip() != ""}
+
+        c_key_str = str(q['Correct Answer']).upper()
+        c_keys = [x.strip() for x in c_key_str.split(',')]
+        correct_texts = [options_map[k] for k in c_keys if k in options_map]
+
+        is_correct = False
+        if q_type == 'single':
+            if str(u_ans) == str(correct_texts[0]) if correct_texts else False:
+                is_correct = True
+        elif q_type == 'multi':
+            if sorted(u_ans or []) == sorted(correct_texts):
+                is_correct = True
+        elif q_type == 'order':
+            if (u_ans or []) == correct_texts:
+                is_correct = True
+        elif q_type == 'text':
+            is_correct = None
+
+        if is_correct:
+            score += points
+
+        details_log[r_idx] = {
+            "answer": u_ans,
+            "correct": is_correct,
+            "type": q_type.capitalize()
+        }
+
+    save_submission(
+        st.session_state['candidate_info'],
+        score,
+        st.session_state['total_points'],
+        details_log
+    )
+
 #def check_if_taken(email):
 #    if not os.path.exists(RESULTS_FILE):
 #        return False
@@ -233,10 +281,40 @@ if st.session_state['page'] == 'login':
 # PAGE 2: THE QUIZ
 # ==================================================
 elif st.session_state['page'] == 'quiz':
+    # --- TIMER SETUP ---
+    if 'quiz_start_time' not in st.session_state:
+        st.session_state['quiz_start_time'] = datetime.now().isoformat()
+
+    start_time = datetime.fromisoformat(st.session_state['quiz_start_time'])
+    elapsed    = (datetime.now() - start_time).total_seconds()
+    remaining  = max(0, QUIZ_DURATION_SECONDS - elapsed)
+
+    # Auto-refresh every 60 seconds — keeps session alive and updates the countdown
+    st_autorefresh(interval=60_000, key="quiz_autorefresh")
+
+    # --- AUTO-SUBMIT when time runs out ---
+    if remaining <= 0:
+        questions = st.session_state['quiz_data']
+        # Collect whatever answers the user has entered via widget keys
+        user_answers = {i: st.session_state.get(f"q{i}") for i in range(len(questions))}
+        grade_and_submit(questions, user_answers)
+        st.session_state['page'] = 'timeout'
+        st.rerun()
+
+    # --- COUNTDOWN DISPLAY ---
+    mins = int(remaining // 60)
+    secs = int(remaining % 60)
+    if remaining < 5 * 60:
+        st.error(f"⏰ Time remaining: {mins:02d}:{secs:02d} — Please submit now!")
+    elif remaining < 10 * 60:
+        st.warning(f"⏳ Time remaining: {mins:02d}:{secs:02d}")
+    else:
+        st.info(f"⏱️ Time remaining: {mins:02d}:{secs:02d}")
+
     info = st.session_state['candidate_info']
     st.title("📝 Quiz Assessments")
     st.caption(f"Candidate: **{info['Name']}** | Company: **{info['Company']}**")
-    
+
     # Warning if points didn't sum perfectly to 100
     if st.session_state['total_points'] != TARGET_POINTS:
         st.warning(f"Note: Questions total {st.session_state['total_points']} points.")
@@ -320,85 +398,25 @@ elif st.session_state['page'] == 'quiz':
         submitted = st.form_submit_button("Submit Assessment", type="primary")
 
         if submitted:
-            score = 0
-            details_log = {}
-            
-            for i, q in enumerate(questions):
-                u_ans = user_answers.get(i) # User's answer (Text or List of Texts)
-                q_type = q['Type']
-                points = q['Points']
-                r_idx = q['row_index'] # The 1-based Excel ID
-                
-                # Setup Option Map
-                options_map = {letter: q.get(letter, "") for letter in OPTION_COLS if str(q.get(letter, "")).strip() != ""}
-
-                # Parse Correct Answer Key (e.g., "A, C" or "B")
-                c_key_str = str(q['Correct Answer']).upper()
-                c_keys = [x.strip() for x in c_key_str.split(',')]
-                
-                # Retrieve the ACTUAL TEXT of the correct options from the Excel row
-                # Example: if Correct Answer is 'A', we need the text in column 'A'
-                correct_texts = []
-                #options_map = {'A': q['A'], 'B': q['B'], 'C': q['C'], 'D': q['D']}
-                
-                for k in c_keys:
-                    if k in options_map:
-                        correct_texts.append(options_map[k])
-                
-                # --- GRADING LOGIC ---
-                
-                is_correct = False
-                
-                if q_type == 'single':
-                    # User sends single string. Check if it matches correct text.
-                    if str(u_ans) == str(correct_texts[0]) if correct_texts else False:
-                        is_correct = True
-                        
-                elif q_type == 'multi':
-                    # User sends list. Order DOES NOT matter. Use sorted()
-                    if sorted(u_ans) == sorted(correct_texts):
-                        is_correct = True
-                        
-                elif q_type == 'order':
-                    # User sends list. Order DOES matter. Compare directly.
-                    if u_ans == correct_texts:
-                        is_correct = True
-                        
-                elif q_type == 'text':
-                    is_correct = None
-                    # No auto-grading. Just Log.
-                    # details_log[f"Q{i+1}"] = f"[TEXT ANSWER]: {u_ans}"
-                    # continue # Skip the score addition part
-                
-                # Apply Score
-                if is_correct:
-                    score += points
-
-                details_log[r_idx] = {
-                    "answer": u_ans,
-                    "correct": is_correct,
-                    "type": q_type.capitalize()
-                }
-
-            # SAVE
-            save_submission(
-                st.session_state['candidate_info'], 
-                score, 
-                st.session_state['total_points'], 
-                details_log
-            )
-            
-            # --- ROUTE TO FINISH PAGE ---
+            grade_and_submit(questions, user_answers)
             st.session_state['page'] = 'success'
-            st.rerun() # Instantly reloads the app
+            st.rerun()
 
-            # ==================================================
-            # PAGE 3: SUBMISSION SUCCESS
-            # ==================================================
+# ==================================================
+# PAGE 3: SUBMISSION SUCCESS
+# ==================================================
 elif st.session_state['page'] == 'success':
     st.title("🎉 Assessment Complete!")
     st.success("Your answers have been successfully recorded. Thank you!")
     st.balloons()
-    
+    st.markdown("---")
+    st.info("You may now close this tab/window.")
+
+# ==================================================
+# PAGE 4: TIME EXPIRED (AUTO-SUBMITTED)
+# ==================================================
+elif st.session_state['page'] == 'timeout':
+    st.title("⏰ Time's Up!")
+    st.warning("Your 45-minute time limit has been reached. Your answers have been automatically submitted.")
     st.markdown("---")
     st.info("You may now close this tab/window.")
