@@ -2,4 +2,3 @@ streamlit
 pandas
 openpyxl
 gspread
-google-authstreamlit-autorefresh
