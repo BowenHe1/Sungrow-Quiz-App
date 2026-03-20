@@ -3,4 +3,3 @@ pandas
 openpyxl
 gspread
 google-auth
-streamlit-autorefresh

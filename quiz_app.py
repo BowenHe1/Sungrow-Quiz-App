@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
-from streamlit_autorefresh import st_autorefresh
+import streamlit.components.v1 as components
 
 # --- CONFIGURATION ---
 QUESTIONS_FILE = "question_pool.xlsx"
@@ -289,27 +289,40 @@ elif st.session_state['page'] == 'quiz':
     elapsed    = (datetime.now() - start_time).total_seconds()
     remaining  = max(0, QUIZ_DURATION_SECONDS - elapsed)
 
-    # Auto-refresh every 60 seconds — keeps session alive and updates the countdown
-    st_autorefresh(interval=60_000, key="quiz_autorefresh")
+    # --- JS countdown timer (real-time display + session keepalive) ---
+    components.html(f"""
+    <div id='cd' style='font-size:16px;font-weight:bold;color:#1F4E79;font-family:sans-serif;padding:4px 0'></div>
+    <script>
+    var end = Date.now() + {int(remaining)} * 1000;
+    function tick() {{
+        var dist = Math.max(0, end - Date.now());
+        var m = String(Math.floor(dist/60000)).padStart(2,'0');
+        var s = String(Math.floor((dist%60000)/1000)).padStart(2,'0');
+        var el = document.getElementById('cd');
+        if (dist <= 0) {{
+            el.style.color='#C00000';
+            el.innerText = '⏰ Time is up! Submitting your answers...';
+            try {{ window.parent.window.stAppV2.rerunScript(false); }} catch(e) {{}}
+        }} else if (dist < 300000) {{
+            el.style.color='#C00000';
+            el.innerText = '⏰ Time remaining: ' + m + ':' + s + ' — Please submit now!';
+        }} else if (dist < 600000) {{
+            el.style.color='#856404';
+            el.innerText = '⏳ Time remaining: ' + m + ':' + s;
+        }} else {{
+            el.style.color='#1F4E79';
+            el.innerText = '⏱️ Time remaining: ' + m + ':' + s;
+        }}
+        if (dist > 0) setTimeout(tick, 1000);
+    }}
+    tick();
+    // Keepalive: trigger Streamlit rerun every 60s
+    setInterval(function() {{
+        try {{ window.parent.window.stAppV2.rerunScript(false); }} catch(e) {{}}
+    }}, 60000);
+    </script>
+    """, height=40)
 
-    # --- AUTO-SUBMIT when time runs out ---
-    if remaining <= 0:
-        questions = st.session_state['quiz_data']
-        # Collect whatever answers the user has entered via widget keys
-        user_answers = {i: st.session_state.get(f"q{i}") for i in range(len(questions))}
-        grade_and_submit(questions, user_answers)
-        st.session_state['page'] = 'timeout'
-        st.rerun()
-
-    # --- COUNTDOWN DISPLAY ---
-    mins = int(remaining // 60)
-    secs = int(remaining % 60)
-    if remaining < 5 * 60:
-        st.error(f"⏰ Time remaining: {mins:02d}:{secs:02d} — Please submit now!")
-    elif remaining < 10 * 60:
-        st.warning(f"⏳ Time remaining: {mins:02d}:{secs:02d}")
-    else:
-        st.info(f"⏱️ Time remaining: {mins:02d}:{secs:02d}")
 
     info = st.session_state['candidate_info']
     st.title("📝 Quiz Assessments")
