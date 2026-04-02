@@ -20,6 +20,9 @@ def load_questions():
         return pd.DataFrame()
         
     df = pd.read_excel(QUESTIONS_FILE)
+
+    # Drop blank rows and fill all remaining NaN with empty string
+    df = df.dropna(subset=['Question Text']).fillna('')
     
     # NEW: Capture the 1-based Excel row index (index + 2 because 0-based + header)
     df['row_index'] = df.index + 2
@@ -28,14 +31,14 @@ def load_questions():
     cols_to_clean = OPTION_COLS + ['Correct Answer']
     for col in cols_to_clean:
         if col in df.columns:
-            df[col] = df[col].astype(str).str.strip()
+            df[col] = df[col].astype(str).replace('nan', '').str.strip()
         else:
             # If column E/F/G/H doesn't exist in Excel, create it as empty
             df[col] = ""    
 
     # Clean Type column
     if 'Type' in df.columns:
-        df['Type'] = df['Type'].astype(str).str.strip().str.lower()
+        df['Type'] = df['Type'].astype(str).replace('nan', '').str.strip().str.lower()
         
     return df
 
