@@ -28,7 +28,7 @@ def load_questions():
     cols_to_clean = OPTION_COLS + ['Correct Answer']
     for col in cols_to_clean:
         if col in df.columns:
-            df[col] = df[col].astype(str).replace('nan', '').str.strip()
+            df[col] = df[col].astype(str).str.strip()
         else:
             # If column E/F/G/H doesn't exist in Excel, create it as empty
             df[col] = ""    
