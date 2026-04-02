@@ -15,12 +15,15 @@ def load_questions():
         return pd.DataFrame()
         
     df = pd.read_excel(QUESTIONS_FILE)
-    
-    # Clean data: Ensure columns are strings and fill NaNs
+
+    # Drop blank rows and fill all remaining NaN with empty string
+    df = df.dropna(subset=['Question Text']).fillna('')
+
+    # Clean data: Ensure columns are strings and strip whitespace
     cols_to_clean = ['A', 'B', 'C', 'D', 'Correct Answer']
     for col in cols_to_clean:
         if col in df.columns:
-            df[col] = df[col].astype(str).replace('nan', '').str.strip()
+            df[col] = df[col].astype(str).str.strip()
             
     # Clean Type column
     if 'Type' in df.columns:
